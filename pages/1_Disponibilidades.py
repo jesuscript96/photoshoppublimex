@@ -1,3 +1,4 @@
+import io
 import os
 import calendar
 from datetime import date, datetime
@@ -5,6 +6,7 @@ from datetime import date, datetime
 import pandas as pd
 import requests
 import streamlit as st
+from PIL import Image
 
 st.set_page_config(
     page_title="Disponibilidades - Publimex",
@@ -29,6 +31,7 @@ HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json
 T_ESPACIOS       = "tblQ9Z0KW0XheaHRc"
 T_RESERVACIONES  = "tbluUAzNFSuaqMrYX"
 T_CLIENTES       = "tblkKHa9CNt285uv1"
+T_MATERIALES     = "tblxP9eGeHVbeBV6r"
 
 MESES_ES = [
     "Enero","Febrero","Marzo","Abril","Mayo","Junio",
@@ -71,7 +74,8 @@ def load_data():
     espacios      = fetch_table(T_ESPACIOS)
     reservaciones = fetch_table(T_RESERVACIONES)
     clientes      = fetch_table(T_CLIENTES)
-    return espacios, reservaciones, clientes
+    materiales    = fetch_table(T_MATERIALES)
+    return espacios, reservaciones, clientes, materiales
 
 
 def refresh():
@@ -152,13 +156,112 @@ def availability_status(res_mes: list) -> tuple[str, str]:
         return "🔴 OCUPADO", "ocupado"
     return "🟡 PROPUESTA", "propuesta"
 
+# ── Presentation / PDF helpers ───────────────────────────────────────────────
+
+_CATS_ORDER = ["Muro", "Muro + Espectacular", "Pantalla Digital", "Valla"]
+
+_CAT_TO_SECCION = {
+    "Muro":               "Sección - Muros",
+    "Muro + Espectacular":"Sección - Muros",
+    "Valla":              "Sección - Vallas",
+    "Pantalla Digital":   "Sección - Pantallas Digitales",
+}
+
+
+def build_presentation_slides(espacios_filtrados: list, materiales: list) -> list:
+    """Returns ordered list of full-size image URLs: Portada → sections+spaces → Cierre."""
+    mat_by_nombre: dict = {}
+    mat_by_tipo: dict = {}
+    for m in materiales:
+        f = m["fields"]
+        mat_by_nombre[f.get("Nombre", "")] = f
+        mat_by_tipo.setdefault(f.get("Tipo", ""), []).append(f)
+
+    urls = []
+
+    for mat in mat_by_tipo.get("Portada", []):
+        for img in mat.get("Imagen", []):
+            if img.get("url"):
+                urls.append(img["url"])
+
+    by_cat: dict = {}
+    for esp in espacios_filtrados:
+        cat = esp["fields"].get("Categoria", "")
+        by_cat.setdefault(cat, []).append(esp)
+
+    added_sections: set = set()
+    for cat in _CATS_ORDER:
+        if cat not in by_cat:
+            continue
+        sec = _CAT_TO_SECCION.get(cat, "")
+        if sec and sec not in added_sections and sec in mat_by_nombre:
+            for img in mat_by_nombre[sec].get("Imagen", []):
+                if img.get("url"):
+                    urls.append(img["url"])
+            added_sections.add(sec)
+        for esp in by_cat[cat]:
+            for img in esp["fields"].get("Imagenes", []):
+                if img.get("url"):
+                    urls.append(img["url"])
+
+    for cat, esps in by_cat.items():
+        if cat in _CATS_ORDER:
+            continue
+        for esp in esps:
+            for img in esp["fields"].get("Imagenes", []):
+                if img.get("url"):
+                    urls.append(img["url"])
+
+    for mat in mat_by_tipo.get("Cierre", []):
+        for img in mat.get("Imagen", []):
+            if img.get("url"):
+                urls.append(img["url"])
+
+    return urls
+
+
+def _fit_to_slide(img: Image.Image, w: int = 1920, h: int = 1080) -> Image.Image:
+    r = img.width / img.height
+    if r > w / h:
+        nw, nh = w, int(w / r)
+    else:
+        nw, nh = int(h * r), h
+    slide = Image.new("RGB", (w, h), (255, 255, 255))
+    slide.paste(img.resize((nw, nh), Image.LANCZOS), ((w - nw) // 2, (h - nh) // 2))
+    return slide
+
+
+def generate_pdf_bytes(image_urls: list, status_placeholder=None) -> bytes | None:
+    pil_imgs = []
+    total = len(image_urls)
+    for i, url in enumerate(image_urls):
+        if status_placeholder:
+            status_placeholder.caption(f"Descargando imagen {i + 1} / {total}…")
+        try:
+            resp = requests.get(url, timeout=20)
+            resp.raise_for_status()
+            img = Image.open(io.BytesIO(resp.content)).convert("RGB")
+            pil_imgs.append(_fit_to_slide(img))
+        except Exception:
+            pass
+
+    if not pil_imgs:
+        return None
+
+    buf = io.BytesIO()
+    pil_imgs[0].save(
+        buf, format="PDF", save_all=True,
+        append_images=pil_imgs[1:], resolution=144,
+    )
+    return buf.getvalue()
+
+
 # ── Page ──────────────────────────────────────────────────────────────────────
 
 st.title("📅 Gestión de Disponibilidades")
 
 if not TOKEN:
-    st.error("⚠️ Falta configurar **AIRTABLE_TOKEN** en los secrets de Streamlit.")
-    st.code('# .streamlit/secrets.toml\nAIRTABLE_TOKEN = "tu_token_aqui"')
+    st.error("⚠️ Error de conexión con la base de datos. Contacta al administrador.")
     st.stop()
 
 # ── Filter bar ────────────────────────────────────────────────────────────────
@@ -186,7 +289,7 @@ with st.container():
 
 with st.spinner("Cargando datos de Airtable..."):
     try:
-        espacios_raw, reservaciones_raw, clientes_raw = load_data()
+        espacios_raw, reservaciones_raw, clientes_raw, materiales_raw = load_data()
     except requests.HTTPError as e:
         st.error(f"Error al conectar con Airtable: {e}")
         st.stop()
@@ -225,6 +328,42 @@ m1.metric("Total espacios", len(espacios_filtered))
 m2.metric("🟢 Libres", libres)
 m3.metric("🔴 Ocupados", ocupados)
 m4.metric("🟡 Propuestas / Pendientes", propuestas)
+
+st.divider()
+
+# ── Presentation download ─────────────────────────────────────────────────────
+
+pres_c1, pres_c2 = st.columns([1, 1])
+with pres_c1:
+    gen_pdf = st.button(
+        "📊 Generar presentación PDF",
+        use_container_width=True,
+        disabled=not espacios_filtered,
+    )
+with pres_c2:
+    if st.session_state.get("pres_pdf"):
+        st.download_button(
+            "⬇️ Descargar PDF",
+            data=st.session_state["pres_pdf"],
+            file_name=st.session_state.get("pres_name", "presentacion.pdf"),
+            mime="application/pdf",
+            use_container_width=True,
+        )
+
+if gen_pdf:
+    slide_urls = build_presentation_slides(espacios_filtered, materiales_raw)
+    _prog = st.empty()
+    with st.spinner(f"Generando presentación ({len(slide_urls)} imágenes)…"):
+        pdf_bytes = generate_pdf_bytes(slide_urls, status_placeholder=_prog)
+    _prog.empty()
+    if pdf_bytes:
+        st.session_state["pres_pdf"] = pdf_bytes
+        st.session_state["pres_name"] = (
+            f"Disponibilidades_{MESES_ES[sel_month - 1]}_{sel_year}.pdf"
+        )
+        st.rerun()
+    else:
+        st.warning("No se encontraron imágenes para generar la presentación.")
 
 st.divider()
 

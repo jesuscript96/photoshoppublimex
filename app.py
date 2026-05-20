@@ -66,24 +66,6 @@ st.markdown("Sube una foto del muro o espectacular, el logo de tu cliente y un p
 
 # Sidebar para la configuración
 with st.sidebar:
-    st.header("⚙️ Configuración")
-
-    if DEFAULT_KREA_KEY:
-        st.success("🔑 **KREA API Conectada**\n\nLista para generar imágenes.")
-        krea_input = st.text_input("Sobrescribir KREA API Key (Opcional):", type="password", value="")
-        if krea_input:
-            st.session_state.krea_api_key = krea_input
-    else:
-        krea_input = st.text_input("Ingresa tu KREA API Key:", type="password", value=st.session_state.krea_api_key)
-        if krea_input:
-            st.session_state.krea_api_key = krea_input
-
-    st.divider()
-    st.markdown("**🧠 Refinamiento de Prompt (Gemini)**")
-    gemini_input = st.text_input("Ingresa tu Gemini API Key (Opcional):", type="password", value=st.session_state.gemini_api_key, help="Solo se usa para mejorar el texto. Es gratis.")
-    if gemini_input:
-        st.session_state.gemini_api_key = gemini_input
-
     st.subheader("🍌 Modelo de Imagen")
     selected_model = st.selectbox(
         "Elige la versión de Nano Banana:",
@@ -137,7 +119,7 @@ def upload_asset(file_bytes, api_key):
 
 if st.button("✨ Generar Imagen / Refinar", type="primary", use_container_width=True):
     if not st.session_state.krea_api_key:
-        st.error("⚠️ Falta la API Key de KREA. Configúrala en la barra lateral.")
+        st.error("⚠️ Error de conexión con el servicio de generación de imágenes. Contacta al administrador.")
     elif not muro_file or not logo_file:
         st.error("⚠️ Debes subir ambas imágenes (el soporte y el logo).")
     elif not user_prompt:
@@ -174,7 +156,7 @@ El prompt debe describir cómo integrar el logo de forma realista sobre el espac
                     st.success("✨ Prompt Refinado Exitosamente")
                     st.info(f"**Prompt Mejorado:** {refined_prompt}")
                 else:
-                    st.warning("⚠️ Sin API Key de Gemini. El prompt se enviará a KREA sin refinamiento previo.")
+                    st.info("ℹ️ El prompt se enviará a KREA sin refinamiento previo.")
 
                 # Paso 2: Subir las imágenes a KREA
                 st.info("Subiendo imágenes a KREA...")
