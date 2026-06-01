@@ -1,262 +1,132 @@
-import os
 import streamlit as st
-import requests
-import time
-from PIL import Image
-from google import genai
+import os
 
-st.set_page_config(page_title="Editor IA - Publimex", page_icon="🎨", layout="centered", initial_sidebar_state="collapsed")
+# Configure global page parameters (ONLY once at the very start of app.py execution)
+st.set_page_config(
+    page_title="Publimex Hub - Suite",
+    page_icon="logo.png" if os.path.exists("logo.png") else "🔴",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# CSS responsivo para móvil
+# Global styles for the entire suite
 st.markdown("""
-<style>
-/* Botones más grandes en móvil */
-@media (max-width: 768px) {
+    <style>
+    /* Force main background to remain clean white */
+    .stApp {
+        background-color: #ffffff !important;
+    }
+    /* Styling Streamlit sidebar and main components to match Crimson Red branding */
+    div[data-testid="stSidebarNav"] {
+        padding-top: 20px;
+    }
+    div[data-testid="stSidebarNav"] ul {
+        padding-bottom: 20px;
+    }
+    /* Style all sidebar navigation icons to be crimson red */
+    [data-testid="stSidebarNav"] span[data-testid="stPageLinkIcon"] {
+        color: #E60000 !important;
+    }
+    /* Set custom active sidebar link coloring */
+    [data-testid="stSidebarNav"] li a[aria-current="page"] {
+        color: #E60000 !important;
+        font-weight: 700;
+    }
+    /* Buttons typography and hover */
     .stButton > button {
-        width: 100% !important;
-        min-height: 3rem !important;
-        font-size: 1.1rem !important;
+        border-radius: 6px !important;
     }
     .stDownloadButton > button {
-        width: 100% !important;
-        min-height: 3rem !important;
-        font-size: 1.1rem !important;
+        border-radius: 6px !important;
     }
-    /* Columnas apiladas en móvil */
-    [data-testid="column"] {
-        min-width: 100% !important;
+    /* Responsive layout padding */
+    .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 3rem !important;
     }
-    /* Área de texto más alta */
-    .stTextArea textarea {
-        min-height: 100px !important;
-    }
-    /* Subir archivos más visible */
-    [data-testid="stFileUploader"] {
-        padding: 1rem 0 !important;
-    }
-    /* Título más pequeño en móvil */
-    h1 {
-        font-size: 1.5rem !important;
-    }
-}
-/* Spinner centrado */
-.stSpinner {
-    text-align: center;
-}
-</style>
+    </style>
 """, unsafe_allow_html=True)
 
-# Cargar API Keys desde Streamlit Secrets (producción) o variables de entorno (local)
-def get_secret(key):
-    try:
-        return st.secrets[key]
-    except Exception:
-        return os.environ.get(key, "")
+# Import page rendering functions (reload triggered)
+from src.pages.login import show_login
+from src.pages.home import show_home
+from src.pages.editor import show_editor
+from src.pages.disponibilidades import show_disponibilidades
+from src.pages.contactos import show_contactos
+from src.pages.reservas import show_reservas
+from src.supabase_client import is_admin
 
-DEFAULT_KREA_KEY = get_secret("KREA_API_KEY")
-DEFAULT_GEMINI_KEY = get_secret("GEMINI_API_KEY")
+# Initialize session state variables
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if "user_token" not in st.session_state:
+    st.session_state.user_token = None
+if "user_id" not in st.session_state:
+    st.session_state.user_id = None
+if "user_email" not in st.session_state:
+    st.session_state.user_email = None
+if "user_name" not in st.session_state:
+    st.session_state.user_name = None
+if "user_role" not in st.session_state:
+    st.session_state.user_role = None
 
-if "krea_api_key" not in st.session_state:
-    st.session_state.krea_api_key = DEFAULT_KREA_KEY
-if "gemini_api_key" not in st.session_state:
-    st.session_state.gemini_api_key = DEFAULT_GEMINI_KEY
+# Fail-safe superuser check
+if st.session_state.user_email and st.session_state.user_email.lower() == "jvalenzuela.chulia@gmail.com":
+    st.session_state.user_role = "administrador"
 
-st.title("🎨 Editor de Anuncios IA - Publimex")
-st.markdown("Sube una foto del muro o espectacular, el logo de tu cliente y un prompt de lo que deseas.")
+# Routing and Navigation based on auth state
+if not st.session_state.authenticated:
+    # If not authenticated, the ONLY available page is Login
+    pages = [
+        st.Page(show_login, title="Iniciar Sesión", icon=":material/login:")
+    ]
+else:
+    # Construct authenticated page suite
+    page_home = st.Page(show_home, title="Panel Inicio", icon=":material/dashboard:")
+    page_editor = st.Page(show_editor, title="Editor IA", icon=":material/palette:")
+    page_disponibilidades = st.Page(show_disponibilidades, title="Disponibilidades", icon=":material/calendar_month:")
+    page_contacts = st.Page(show_contactos, title="Mis Contactos", icon=":material/contacts:")
+    page_reservas = st.Page(show_reservas, title="Mis Reservas", icon=":material/book_online:")
 
-# Sidebar para la configuración
-with st.sidebar:
-    st.subheader("🍌 Modelo de Imagen")
-    selected_model = st.selectbox(
-        "Elige la versión de Nano Banana:",
-        options=[
-            "nano-banana",
-            "nano-banana-2",
-            "nano-banana-pro"
-        ],
-        format_func=lambda x: {
-            "nano-banana": "Nano Banana (Rápido)",
-            "nano-banana-2": "Nano Banana 2 (Calidad)",
-            "nano-banana-pro": "Nano Banana Pro (Alta Fidelidad)"
-        }.get(x, x),
-        index=1
-    )
+    # Save to session state so show_home or other pages can call st.switch_page
+    st.session_state.page_home = page_home
+    st.session_state.page_editor = page_editor
+    st.session_state.page_disponibilidades = page_disponibilidades
+    st.session_state.page_contacts = page_contacts
+    st.session_state.page_reservas = page_reservas
 
-    st.divider()
-    st.markdown("""
-    **💡 KREA AI:**
-    Estamos utilizando los modelos de Google (Nano Banana) a través de la infraestructura de KREA para una integración perfecta.
-    """)
+    pages = [
+        page_home,
+        page_editor,
+        page_disponibilidades,
+        page_contacts,
+        page_reservas
+    ]
 
-col1, col2 = st.columns(2)
+# Setup and run dynamic navigation
+pg = st.navigation(pages)
 
-with col1:
-    st.subheader("1. Imagen del Soporte")
-    muro_file = st.file_uploader("Sube la foto del muro/espectacular", type=["jpg", "jpeg", "png"])
-    if muro_file:
-        muro_img = Image.open(muro_file)
-        st.image(muro_img, caption="Muro / Espectacular", use_container_width=True)
+# Display corporate logo at the top of the sidebar if authenticated
+if st.session_state.authenticated:
+    with st.sidebar:
+        if os.path.exists("logo.png"):
+            st.image("logo.png", use_container_width=True)
+        st.write("")
 
-with col2:
-    st.subheader("2. Creatividad / Logo")
-    logo_file = st.file_uploader("Sube el logo o creatividad", type=["jpg", "jpeg", "png"])
-    if logo_file:
-        logo_img = Image.open(logo_file)
-        st.image(logo_img, caption="Logo", use_container_width=True)
+# Execute the active page
+pg.run()
 
-st.subheader("3. Instrucciones de Edición")
-user_prompt = st.text_area("¿Cómo quieres que se integre el anuncio?", placeholder="Ej. Pon el logo en el centro de la valla, con efecto de luz natural de tarde...", height=100)
-
-
-def upload_asset(file_bytes, api_key):
-    headers = {'Authorization': f'Bearer {api_key}'}
-    files = {'file': ('image.jpg', file_bytes, 'image/jpeg')}
-    res = requests.post('https://api.krea.ai/assets', headers=headers, files=files)
-    if res.status_code != 200:
-        raise Exception(f"Error al subir imagen a KREA: {res.text}")
-    return res.json()['image_url']
-
-
-if st.button("✨ Generar Imagen / Refinar", type="primary", use_container_width=True):
-    if not st.session_state.krea_api_key:
-        st.error("⚠️ Error de conexión con el servicio de generación de imágenes. Contacta al administrador.")
-    elif not muro_file or not logo_file:
-        st.error("⚠️ Debes subir ambas imágenes (el soporte y el logo).")
-    elif not user_prompt:
-        st.error("⚠️ Debes ingresar un prompt o instrucción.")
-    else:
-        with st.spinner(f"Procesando las imágenes y enviando a KREA con {selected_model}..."):
-            try:
-                # Paso 1: Refinamiento del Prompt (si hay llave de Gemini)
-                refined_prompt = user_prompt
-                if st.session_state.gemini_api_key:
-                    st.info("🧠 Refinando el prompt con Gemini...")
-                    client = genai.Client(api_key=st.session_state.gemini_api_key)
-                    system_prompt = f"""Actúa como un diseñador gráfico experto y un Prompt Engineer de primer nivel.
-El usuario quiere crear una imagen donde se integre un logo sobre un muro o valla publicitaria.
-El usuario dio esta instrucción básica: "{user_prompt}"
-
-Tu trabajo es expandir y mejorar esta instrucción para que sea un prompt de generación de imagen perfecto para un modelo difusor.
-REGLA CRÍTICA ABSOLUTA 1: Debes intuir siempre que cuando se hable de un edificio, valla, o muro, la edición se hará EXCLUSIVAMENTE sobre el espacio publicitario vacío o reemplazando un anuncio existente. EN NINGÚN CASO se trata de cubrir un edificio entero de publicidad.
-REGLA CRÍTICA ABSOLUTA 2: Debes ser ESTRICTAMENTE FIEL a la creatividad o logotipo proporcionado. ESTÁ PROHIBIDO inventar elementos, cambiar colores, tipografías o añadir textos creativos al anuncio original. Limítate a adaptar la perspectiva, luces y sombras, respetando la imagen original al 100%.
-
-El prompt debe describir cómo integrar el logo de forma realista sobre el espacio asignado en el muro, ajustando la perspectiva, las sombras, y la iluminación para que parezca una integración real, no un pegado. No incluyas texto de relleno, solo devuelve el prompt mejorado en un solo párrafo."""
-
-                    try:
-                        response_prompt = client.models.generate_content(
-                            model="gemini-2.5-flash",
-                            contents=system_prompt
-                        )
-                    except Exception:
-                        response_prompt = client.models.generate_content(
-                            model="gemini-1.5-flash",
-                            contents=system_prompt
-                        )
-                    refined_prompt = response_prompt.text.strip()
-                    st.success("✨ Prompt Refinado Exitosamente")
-                    st.info(f"**Prompt Mejorado:** {refined_prompt}")
-                else:
-                    st.info("ℹ️ El prompt se enviará a KREA sin refinamiento previo.")
-
-                # Paso 2: Subir las imágenes a KREA
-                st.info("Subiendo imágenes a KREA...")
-                muro_file.seek(0)
-                logo_file.seek(0)
-                muro_url = upload_asset(muro_file.getvalue(), st.session_state.krea_api_key)
-                logo_url = upload_asset(logo_file.getvalue(), st.session_state.krea_api_key)
-
-                # Paso 3: Construir el Prompt Final
-                prompt_vision = f"""Actúa como un diseñador gráfico experto.
-La primera imagen que recibes es el muro/espectacular de referencia. La segunda imagen es el logo/creatividad a integrar.
-
-REGLA CRÍTICA ABSOLUTA 1: La publicidad DEBE colocarse ÚNICAMENTE en el espacio publicitario vacío de la valla, cartel o marco disponible. ESTÁ PROHIBIDO cubrir todo el edificio o arquitectura con la publicidad.
-REGLA CRÍTICA ABSOLUTA 2: Sé ESTRICTAMENTE FIEL a la creatividad original. NO inventes textos, gráficos ni cambies el diseño del logotipo o arte proporcionado.
-
-Integra el logo de forma realista sobre el espacio publicitario del muro, ajustando la perspectiva, las sombras, y la iluminación para que parezca una integración real, no un pegado.
-Instrucción a seguir: {refined_prompt}"""
-
-                st.success("✨ Imágenes subidas. Iniciando generación...")
-
-                # Paso 4: Llamar al endpoint de generación de KREA
-                headers = {
-                    'Authorization': f'Bearer {st.session_state.krea_api_key}',
-                    'Content-Type': 'application/json'
-                }
-                data = {
-                    'prompt': prompt_vision,
-                    'imageUrls': [muro_url, logo_url]
-                }
-
-                endpoint = f"https://api.krea.ai/generate/image/google/{selected_model}"
-                res = requests.post(endpoint, headers=headers, json=data)
-
-                if res.status_code != 200:
-                    raise Exception(f"Error al iniciar generación: {res.text}")
-
-                job_id = res.json().get('job_id')
-                if not job_id:
-                    raise Exception("No se recibió un job_id válido.")
-
-                # Paso 5: Polling del estado
-                job_url = f"https://api.krea.ai/jobs/{job_id}"
-                st.info("Generando imagen... (esto puede tomar unos segundos)")
-
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-
-                completed = False
-                for i in range(60):
-                    job_res = requests.get(job_url, headers=headers)
-                    if job_res.status_code != 200:
-                        raise Exception(f"Error al consultar estado: {job_res.text}")
-
-                    job_data = job_res.json()
-                    status = job_data.get('status')
-
-                    if status == 'completed':
-                        result_urls = job_data.get('result', {}).get('urls', [])
-                        if result_urls:
-                            st.success("✨ ¡Generación completada!")
-                            st.image(result_urls[0], caption=f"Imagen generada por {selected_model}", use_container_width=True)
-
-                            try:
-                                img_response = requests.get(result_urls[0])
-                                if img_response.status_code == 200:
-                                    st.download_button(
-                                        label="⬇️ Descargar Imagen",
-                                        data=img_response.content,
-                                        file_name="anuncio_publimex.png",
-                                        mime="image/png",
-                                        type="primary",
-                                        use_container_width=True
-                                    )
-                            except Exception:
-                                st.warning("No se pudo crear el botón de descarga. Puedes guardar la imagen con click derecho.")
-                        else:
-                            st.warning("El modelo completó el trabajo pero no devolvió ninguna URL.")
-                        completed = True
-                        break
-                    elif status in ['failed', 'cancelled']:
-                        st.error(f"❌ La generación falló o fue cancelada por KREA. Estado: {status}")
-                        completed = True
-                        break
-
-                    status_text.text(f"Estado: {status}...")
-                    progress_bar.progress(min((i + 1) * 2, 99))
-                    time.sleep(2)
-
-                if not completed:
-                    st.warning("⚠️ Tiempo de espera agotado consultando a KREA.")
-
-            except Exception as e:
-                st.error(f"⚠️ **Ocurrió un error:** {e}")
-
-st.divider()
-st.markdown("### ✨ Mejorar con un clic")
-st.markdown("¿El resultado no es perfecto? Pide ajustes a la IA:")
-col_adj1, col_adj2 = st.columns([3, 1])
-with col_adj1:
-    adjustment = st.text_input("Ajuste adicional:", placeholder="Ej. Mantén la posición pero ajusta mejor las sombras", label_visibility="collapsed")
-with col_adj2:
-    if st.button("Ajustar Resultado", use_container_width=True):
-        st.info("🔧 Esta función tomará la imagen anterior y el nuevo prompt para perfeccionar el resultado.")
+# Display sidebar user details and logout button if authenticated
+if st.session_state.authenticated:
+    with st.sidebar:
+        st.write("")
+        st.write("")
+        st.divider()
+        st.markdown(f"**Sesión Activa:**")
+        st.markdown(f'<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#E60000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span style="font-weight: 500;">{st.session_state.user_name}</span></div>', unsafe_allow_html=True)
+        role_label = "Admin" if is_admin(st.session_state.user_role) else "Usuario"
+        st.markdown(f'<div style="display: flex; align-items: center; gap: 8px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#E60000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg><span style="color: #64748b;">{role_label}</span></div>', unsafe_allow_html=True)
+        st.write("")
+        if st.button("Cerrar Sesión", icon=":material/logout:", type="primary", use_container_width=True, key="sidebar_logout_btn"):
+            st.session_state.clear()
+            st.rerun()
