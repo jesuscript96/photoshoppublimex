@@ -2,11 +2,24 @@
 headless = true
 enableCORS = false
 enableXsrfProtection = false
+enableStaticServing = true
 
 [theme]
 base = "light"
 primaryColor = "#E60000"
 backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F8F9FA"
-textColor = "#111111"
-font = "sans serif"
+secondaryBackgroundColor = "#FAFAF9"
+textColor = "#1A1A1A"
+borderColor = "#E6E4DF"
+linkColor = "#C20000"
+baseRadius = "none"
+baseFontSize = 15
+showSidebarBorder = true
+font = "Outfit, sans-serif"
+headingFont = "Outfit, sans-serif"
+
+[[theme.fontFaces]]
+family = "Outfit"
+url = "app/static/fonts/Outfit.ttf"
+weight = "100 900"
+style = "normal"

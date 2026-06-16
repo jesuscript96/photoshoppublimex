@@ -357,6 +357,8 @@ def show_login():
                                     st.session_state.user_role = res["role"]
                                     st.success("¡Inicio de sesión exitoso!")
                                     st.rerun()
+                                elif res.get("conn_error"):
+                                    st.warning(res["error"], icon=":material/cloud_off:")
                                 else:
                                     st.error(f"Error de inicio de sesión: {res['error']}")
                                     
@@ -382,6 +384,8 @@ def show_login():
                                 res = supabase_signup(new_email, new_password, new_name, new_role)
                                 if res["success"]:
                                     st.success("¡Registro completado! Ya puedes iniciar sesión con tus credenciales.")
+                                elif res.get("conn_error"):
+                                    st.warning(res["error"], icon=":material/cloud_off:")
                                 else:
                                     st.error(f"Error al registrar: {res['error']}")
 

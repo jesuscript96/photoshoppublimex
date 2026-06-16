@@ -17,6 +17,15 @@ def get_supabase_key():
 def is_supabase_configured() -> bool:
     return bool(get_supabase_url() and get_supabase_key())
 
+# Mensaje amigable cuando no se puede conectar con Supabase (DNS/timeout/servicio caído).
+# Suele pasar si el proyecto de Supabase está pausado por inactividad (plan gratuito):
+# basta con restaurarlo en el panel y esperar ~1 minuto a que arranque.
+CONN_ERROR_MSG = (
+    "No se pudo conectar con el servidor. El servicio puede estar iniciándose o en "
+    "pausa temporal. Espera ~1 minuto y vuelve a intentarlo. Si el problema persiste, "
+    "contacta al administrador."
+)
+
 def _get_headers(token=None):
     headers = {
         "apikey": get_supabase_key(),
@@ -65,8 +74,10 @@ def supabase_signup(email, password, name, role="vendedor"):
             requests.post(profile_url, headers=_get_headers(access_token), json=profile_payload, timeout=5)
             
         return {"success": True, "data": user_data}
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+        return {"success": False, "error": CONN_ERROR_MSG, "conn_error": True}
     except Exception as e:
-        return {"success": False, "error": f"Error de conexión: {str(e)}"}
+        return {"success": False, "error": f"Error inesperado: {str(e)}"}
 
 def supabase_login(email, password):
     if not is_supabase_configured():
@@ -121,8 +132,10 @@ def supabase_login(email, password):
             "name": name,
             "role": role
         }
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+        return {"success": False, "error": CONN_ERROR_MSG, "conn_error": True}
     except Exception as e:
-        return {"success": False, "error": f"Error de conexión: {str(e)}"}
+        return {"success": False, "error": f"Error inesperado: {str(e)}"}
 
 # ── CRUD de Contactos Privados ──
 

@@ -11,6 +11,7 @@ from src.supabase_client import (
     get_all_contacts,
     get_all_profiles
 )
+from src.theme import page_header
 
 # ── Airtable client loader ────────────────────────────────────────────────────
 
@@ -50,21 +51,11 @@ def refresh():
 # ── Main view function ────────────────────────────────────────────────────────
 
 def show_contactos():
-    st.markdown("""
-        <style>
-        .contacts-header {
-            font-size: 2rem;
-            font-weight: 800;
-            color: #111111;
-            margin-bottom: 5px;
-        }
-        .contacts-header span {
-            color: #E60000;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="contacts-header"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#E60000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 22px; height: 22px; display: inline-block; vertical-align: -4px; margin-right: 8px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos <span>Privados / Globales</span></div>', unsafe_allow_html=True)
+    page_header(
+        "Contactos",
+        "Administra tu agenda de contactos y clientes (privada, o global si eres administrador).",
+        eyebrow="Datos",
+    )
 
     user_id = st.session_state.get("user_id")
     token = st.session_state.get("user_token")

@@ -12,6 +12,7 @@ from src.supabase_client import (
     get_all_profiles,
     assign_reservation_to_user
 )
+from src.theme import page_header, use_full_width
 
 # ── Airtable credentials & loader ─────────────────────────────────────────────
 
@@ -163,7 +164,7 @@ def render_admin_calendar(espacios_raw, reservaciones_raw, clientes_raw, supabas
     # Build HTML table
     html = []
     html.append("""
-    <div style="overflow-x: auto; width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; margin-top: 15px;">
+    <div style="overflow-x: auto; width: 100%; border: 1px solid #E6E4DF; border-radius: 0; margin-top: 15px;">
       <table class="global-calendar-table" style="width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 0.82rem; color: #334155; min-width: 1000px;">
         <style>
           .global-calendar-table th {
@@ -286,7 +287,7 @@ def render_admin_calendar(espacios_raw, reservaciones_raw, clientes_raw, supabas
                     tooltip_escaped = tooltip.replace('"', '&quot;')
                     
                     html.append(f"""
-                <div style="background-color: {color['bg']}; color: {color['text']}; border: 1px solid {color['border']}; border-radius: 4px; padding: 3px 5px; font-size: 0.68rem; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75px; width: 100%; cursor: help;" title="{tooltip_escaped}">
+                <div style="background-color: {color['bg']}; color: {color['text']}; border: 1px solid {color['border']}; border-radius: 0; padding: 3px 5px; font-size: 0.68rem; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75px; width: 100%; cursor: help;" title="{tooltip_escaped}">
                   {client_name}
                 </div>
                     """)
@@ -309,21 +310,12 @@ def render_admin_calendar(espacios_raw, reservaciones_raw, clientes_raw, supabas
 # ── Main view function ────────────────────────────────────────────────────────
 
 def show_reservas():
-    st.markdown("""
-        <style>
-        .reservas-header {
-            font-size: 2rem;
-            font-weight: 800;
-            color: #111111;
-            margin-bottom: 5px;
-        }
-        .reservas-header span {
-            color: #E60000;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="reservas-header"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#E60000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 22px; height: 22px; display: inline-block; vertical-align: -4px; margin-right: 8px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>Reservas <span>Asignadas / Globales</span></div>', unsafe_allow_html=True)
+    use_full_width()
+    page_header(
+        "Reservas",
+        "Gestiona las reservaciones asignadas (o globales si eres administrador): precios, notas y estados.",
+        eyebrow="Ventas",
+    )
     
     user_id = st.session_state.get("user_id")
     token = st.session_state.get("user_token")

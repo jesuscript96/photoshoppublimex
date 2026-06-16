@@ -4,6 +4,7 @@ import requests
 import time
 from PIL import Image
 from google import genai
+from src.theme import page_header
 
 # Helper for API Keys
 def get_secret(key):
@@ -21,22 +22,6 @@ def upload_asset(file_bytes, api_key):
     return res.json()['image_url']
 
 def show_editor():
-    # Page CSS styles
-    st.markdown("""
-    <style>
-    /* Styling elements under red/black branding */
-    .editor-header {
-        font-size: 2rem;
-        font-weight: 800;
-        color: #111111;
-        margin-bottom: 5px;
-    }
-    .editor-header span {
-        color: #E60000;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
     DEFAULT_KREA_KEY = get_secret("KREA_API_KEY")
     DEFAULT_GEMINI_KEY = get_secret("GEMINI_API_KEY")
 
@@ -45,8 +30,11 @@ def show_editor():
     if "gemini_api_key" not in st.session_state:
         st.session_state.gemini_api_key = DEFAULT_GEMINI_KEY
 
-    st.markdown('<div class="editor-header"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#E60000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 22px; height: 22px; display: inline-block; vertical-align: -4px; margin-right: 8px;"><path d="M12 22C17.52 22 22 17.52 22 12S17.52 2 12 2 2 6.52 2 12c0 1.5.5 3 1.5 4.14.3.36.75.56 1.23.56h1.4c.78 0 1.4.62 1.4 1.4v1.4c0 .48.2.93.56 1.23C9 21.5 10.5 22 12 22z"/></svg>Editor de Anuncios IA - <span>Publimex</span></div>', unsafe_allow_html=True)
-    st.markdown("Sube una foto del muro o espectacular, el logo de tu cliente y escribe las instrucciones para integrar el anuncio.")
+    page_header(
+        "Editor de Anuncios IA",
+        "Sube una foto del soporte y la creatividad del cliente, y deja que la IA integre el anuncio.",
+        eyebrow="Herramientas",
+    )
 
     # Sidebar settings
     with st.sidebar:

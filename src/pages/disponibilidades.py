@@ -17,6 +17,7 @@ from src.supabase_client import (
     get_all_reservations,
     get_all_profiles
 )
+from src.theme import page_header, use_full_width
 
 # ── Credentials & constants ───────────────────────────────────────────────────
 
@@ -258,21 +259,12 @@ def generate_pdf_bytes(image_urls: list, status_placeholder=None) -> bytes | Non
 # ── Main view function ────────────────────────────────────────────────────────
 
 def show_disponibilidades():
-    st.markdown("""
-        <style>
-        .disp-header {
-            font-size: 2rem;
-            font-weight: 800;
-            color: #111111;
-            margin-bottom: 5px;
-        }
-        .disp-header span {
-            color: #E60000;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="disp-header">📅 Gestión de <span>Disponibilidades</span></div>', unsafe_allow_html=True)
+    use_full_width()
+    page_header(
+        "Disponibilidades",
+        "Consulta los soportes libres u ocupados, genera presentaciones y gestiona reservaciones.",
+        eyebrow="Ventas",
+    )
 
     if not TOKEN:
         st.error("⚠️ Error de conexión con la base de datos de Airtable. Contacta al administrador.")
