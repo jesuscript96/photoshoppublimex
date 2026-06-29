@@ -33,6 +33,9 @@ T_MATERIALES     = "tblxP9eGeHVbeBV6r"
 T_EXPEDIENTES    = "tblQS1aJLOPJUE1bP"
 T_PRESUPUESTOS   = "tblX4TboVxCANUKSI"
 T_DOCUMENTOS     = "tblFrBtscu4LzpS78"
+T_CONTACTOS      = "tblGwl7XXruQWLzmD"
+T_AVANCES        = "tblG4aDf82ZyYHpne"
+T_CAMPANAS       = "tbloNoGmbs8AimCer"
 
 # ── Catálogos de valores (deben coincidir con los singleSelect de Airtable) ─────
 
@@ -45,10 +48,13 @@ PRESUPUESTO_ESTADOS = [
 ]
 
 DOC_TIPOS = [
-    "Presentación", "Presupuesto", "Contrato", "Pagaré", "Justificante de pago",
-    "Factura (CFDI)", "Complemento de pago", "Orden de compra",
-    "Documento de pago del cliente", "Arte/Creatividad", "Presupuesto de montaje",
-    "Orden de montaje", "Prueba de montaje", "Otro",
+    "Presentación", "Disponibilidad", "Propuesta", "Cotización", "Presupuesto",
+    "Orden de compra inicial", "Orden de compra final", "Contrato", "Pagaré",
+    "Factura mensual", "Factura (CFDI)", "Complemento de pago", "Justificante de pago",
+    "Documento de pago del cliente", "Conciliación de inventario/precios",
+    "Acta Constitutiva", "Constancia de Situación Fiscal (CSF)", "Datos bancarios",
+    "Poder Notarial", "Comprobante de domicilio", "INE apoderado legal",
+    "Arte/Creatividad", "Presupuesto de montaje", "Orden de montaje", "Prueba de montaje", "Otro",
 ]
 
 DOC_DIRECCIONES = ["Enviado", "Recibido"]
@@ -56,15 +62,29 @@ DOC_ESTADOS = ["Pendiente", "Recibido", "Validado", "Vencido"]
 
 # Tipos de documento sugeridos por etapa (para guiar el formulario)
 TIPOS_POR_ETAPA = {
-    "Solicitud":    ["Presentación", "Otro"],
-    "Presupuesto":  ["Presupuesto", "Otro"],
+    "Solicitud":    ["Presentación", "Disponibilidad", "Otro"],
+    "Presupuesto":  ["Propuesta", "Cotización", "Disponibilidad", "Presentación", "Otro"],
     "Contratación": [
-        "Contrato", "Pagaré", "Orden de compra", "Documento de pago del cliente",
-        "Justificante de pago", "Factura (CFDI)", "Complemento de pago", "Otro",
+        "Orden de compra inicial", "Orden de compra final", "Contrato", "Pagaré",
+        "Factura mensual", "Conciliación de inventario/precios", "Documento de pago del cliente", "Otro",
     ],
     "Producción":   ["Arte/Creatividad", "Presupuesto de montaje", "Orden de montaje", "Otro"],
     "Cierre":       ["Prueba de montaje", "Otro"],
 }
+
+# ── Solicitud (descarga de información del cliente) ──
+FASES_SOLICITUD = ["Negociación", "Inicio", "En Pausa", "Propuesta Enviada"]
+ROLES_CONTACTO = ["Contacto directo", "Director / Jefe", "Operativo"]
+TIPO_PRODUCTO = ["Muro", "Espectacular", "Muro + Espectacular", "Pantalla Digital", "Valla", "Autobús", "Otro"]
+CIUDADES = ["CDMX", "Estado de México", "Guadalajara", "Monterrey", "Toluca", "Acapulco", "Otra"]
+
+# ── Contratación ──
+CAMPANA_ESTADOS = ["Activa", "Cerrada", "Cancelada"]
+# Checklist de expediente fiscal (alta del cliente para facturación)
+FISCAL_DOCS = [
+    "Acta Constitutiva", "Constancia de Situación Fiscal (CSF)", "Datos bancarios",
+    "Poder Notarial", "Comprobante de domicilio", "INE apoderado legal",
+]
 
 # Estado de reservación efectiva (Airtable Reservaciones.Estado)
 RESERVA_ESTADOS = ["Propuesta", "Confirmada", "Activa", "Finalizada", "Cancelada", "Pendiente"]
@@ -242,3 +262,49 @@ def create_reservacion(espacio_id: str, cliente_id: str, fecha_inicio: str,
     if notas:
         fields["Notas"] = notas
     return create_record(T_RESERVACIONES, fields)
+
+# ── Contactos de expediente (multi-contacto con rol) ─────────────────────────────
+
+def list_contactos(expediente_id: str) -> list:
+    todos = _all_records(T_CONTACTOS)
+    return [c for c in todos if expediente_id in c.get("fields", {}).get("Expediente", [])]
+
+def create_contacto(fields: dict):
+    return create_record(T_CONTACTOS, fields)
+
+def update_contacto(record_id: str, fields: dict) -> bool:
+    return update_record(T_CONTACTOS, record_id, fields)
+
+def delete_contacto(record_id: str) -> bool:
+    return delete_record(T_CONTACTOS, record_id)
+
+# ── Avances / bitácora de seguimiento ───────────────────────────────────────────
+
+def list_avances(expediente_id: str) -> list:
+    todos = _all_records(T_AVANCES)
+    return [a for a in todos if expediente_id in a.get("fields", {}).get("Expediente", [])]
+
+def create_avance(fields: dict):
+    return create_record(T_AVANCES, fields)
+
+def delete_avance(record_id: str) -> bool:
+    return delete_record(T_AVANCES, record_id)
+
+# ── Campañas (etapa de Contratación) ────────────────────────────────────────────
+
+def list_campanas(expediente_id: str) -> list:
+    todos = _all_records(T_CAMPANAS)
+    return [c for c in todos if expediente_id in c.get("fields", {}).get("Expediente", [])]
+
+def create_campana(fields: dict):
+    return create_record(T_CAMPANAS, fields)
+
+def update_campana(record_id: str, fields: dict) -> bool:
+    return update_record(T_CAMPANAS, record_id, fields)
+
+def delete_campana(record_id: str) -> bool:
+    return delete_record(T_CAMPANAS, record_id)
+
+def list_documentos_campana(campana_id: str) -> list:
+    todos = _all_records(T_DOCUMENTOS)
+    return [d for d in todos if campana_id in d.get("fields", {}).get("Campana", [])]
